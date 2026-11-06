@@ -17,6 +17,8 @@
 #include <maya/MFnSkinCluster.h>
 #include <maya/MDagPathArray.h>
 #include <maya/MItMeshVertex.h>
+#include <maya/MRenderer.h>
+#include <maya/M3dView.h>
 
 #include <cmath>
 #include <cstdio>
@@ -335,7 +337,11 @@ void ScaleInfluenceWeightsPaintContext::refreshPreview()
 {
     MDagPath meshPath;
     if (resolveTargetMesh(meshPath))
+    {
         updatePreviewColors(meshPath);
+        MHWRender::MRenderer::setGeometryDrawDirty(meshPath);
+        M3dView::active3dView().refresh(false, true);
+    }
 }
 
 
@@ -517,6 +523,8 @@ MStatus ScaleInfluenceWeightsPaintContext::handlePress(MEvent& event, MHWRender:
         applyCommandToVerts(meshPath, verts, opacities);
         recordStamp(m_hitPoint);
         updatePreviewColors(meshPath);
+        MHWRender::MRenderer::setGeometryDrawDirty(meshPath);
+        M3dView::active3dView().refresh(false, true);
     }
 
     return MS::kSuccess;
@@ -552,6 +560,8 @@ MStatus ScaleInfluenceWeightsPaintContext::handleDrag(MEvent& event, MHWRender::
         applyCommandToVerts(meshPath, verts, opacities);
         recordStamp(m_hitPoint);
         updatePreviewColors(meshPath);
+        MHWRender::MRenderer::setGeometryDrawDirty(meshPath);
+        M3dView::active3dView().refresh(false, true);
     }
 
     return MS::kSuccess;
@@ -1315,7 +1325,7 @@ bool ScaleInfluenceWeightsPaintContext::updatePreviewColors(const MDagPath& mesh
     status = meshFn.setDisplayColors(true);
     if (status != MS::kSuccess)
         return false;
-
+    MHWRender::MRenderer::setGeometryDrawDirty(meshPath);
     return true;
 }
 
@@ -1460,7 +1470,7 @@ bool ScaleInfluenceWeightsPaintContext::updatePreviewColorsSubset(const MDagPath
         }
     }
 
-    MString colorSetName("siwPreviewColorSet");
+    MString colorSetName(kPreviewColorSetName);
     MStringArray sets;
     meshFn.getColorSetNames(sets);
 
@@ -1490,7 +1500,7 @@ bool ScaleInfluenceWeightsPaintContext::updatePreviewColorsSubset(const MDagPath
     status = meshFn.setDisplayColors(true);
     if (status != MS::kSuccess)
         return false;
-
+    MHWRender::MRenderer::setGeometryDrawDirty(meshPath);
     return true;
 }
 
