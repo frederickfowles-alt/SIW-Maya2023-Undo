@@ -1,4 +1,5 @@
 #include "scaleInfluenceWeightsPaintContext.h"
+#include "scaleInfluenceWeightsCmd.h"
 #include "BrushSolverCache.h"
 #include "SmoothInfluenceWeightsStrokeUndoCmd.h"
 
@@ -1145,26 +1146,30 @@ bool ScaleInfluenceWeightsPaintContext::applyCommandToVerts(const MDagPath& mesh
 
     MGlobal::setActiveSelectionList(tempSel, MGlobal::kReplaceList);
 
-    MString cmd = "scaleInfluenceWeights ";
-    cmd += "-g \""; cmd += meshName; cmd += "\" ";
-    cmd += "-so 1 ";
-    cmd += "-ko "; cmd += (m_keepOnes ? 1 : 0); cmd += " ";
-    cmd += "-it "; cmd += m_iterations; cmd += " ";
-    cmd += "-str "; cmd += m_strength; cmd += " ";
-    cmd += "-bd "; cmd += m_bleedDistance; cmd += " ";
-    cmd += "-bf "; cmd += m_bleedFalloff; cmd += " ";
-    cmd += "-sf "; cmd += m_scaleFactor; cmd += " ";
-
+    // Execute the existing Scale solver directly, without registering a
+    // separate undoable MPxCommand for each brush stamp.  The paint context
+    // commits one complete-stroke snapshot in handleRelease().
+    MArgList args;
+    args.addArg(MString("-g")); args.addArg(meshName);
+    args.addArg(MString("-so")); args.addArg(true);
+    args.addArg(MString("-ko")); args.addArg(m_keepOnes);
+    args.addArg(MString("-it")); args.addArg(m_iterations);
+    args.addArg(MString("-str")); args.addArg(m_strength);
+    args.addArg(MString("-bd")); args.addArg(m_bleedDistance);
+    args.addArg(MString("-bf")); args.addArg(m_bleedFalloff);
+    args.addArg(MString("-sf")); args.addArg(m_scaleFactor);
     for (unsigned int i = 0; i < m_influences.length(); ++i)
     {
-        cmd += "-inf \""; cmd += m_influences[i]; cmd += "\" ";
+        args.addArg(MString("-inf"));
+        args.addArg(m_influences[i]);
     }
     for (unsigned int i = 0; i < m_lockedInfluences.length(); ++i)
     {
-        cmd += "-linf \""; cmd += m_lockedInfluences[i]; cmd += "\" ";
+        args.addArg(MString("-linf"));
+        args.addArg(m_lockedInfluences[i]);
     }
-
-    const MStatus status = MGlobal::executeCommand(cmd, false, false);
+    ScaleInfluenceWeightsCmd stampSolver;
+    const MStatus status = stampSolver.doIt(args);
     MGlobal::setActiveSelectionList(oldSel, MGlobal::kReplaceList);
     (void)opacities;
     return status == MS::kSuccess;
