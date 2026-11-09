@@ -21,15 +21,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# Modified by Next Level Games using the following copyright.
-# Copyright (C)Nintendo All rights reserved.
-
-# These coded instructions, statements, and computer programs contain proprietary information
-# of Nintendo and/or its affiliates and are protected by national and international copyright laws.
-# They may not be disclosed to third parties or copied or duplicated in any form, in whole or in part,
-# without the prior written consent of Nintendo.
-
-# The content herein is highly confidential and should be handled accordingly
 
 import maya.cmds as cmds
 try:
@@ -156,7 +147,7 @@ class InfluenceTreeWidget(QtWidgets.QTreeWidget):
                     return
         except Exception:
             pass
-        super(InfluenceTreeWidget, self).mousePressEvent(event)
+        QtWidgets.QTreeWidget.mousePressEvent(self, event)
 
 
 class _BasePanel(QtWidgets.QWidget):
@@ -176,6 +167,7 @@ class _BasePanel(QtWidgets.QWidget):
         self._poll_timer = None
         self._active_shape = None
         self._preview_shapes = set()
+        self._preview_display_states = {}
         self._tree_items_by_name = {}
         self._build_ui()
         self._building = False
@@ -270,6 +262,10 @@ class _BasePanel(QtWidgets.QWidget):
         row2.addWidget(btn_activate)
         layout.addLayout(row2)
 
+        btn_deactivate = QtWidgets.QPushButton("Deactivate Brush")
+        btn_deactivate.clicked.connect(self.deactivate_brush)
+        layout.addWidget(btn_deactivate)
+
         btn_flood = QtWidgets.QPushButton("Flood Apply")
         btn_flood.clicked.connect(self.flood_apply)
         layout.addWidget(btn_flood)
@@ -294,29 +290,22 @@ class _BasePanel(QtWidgets.QWidget):
         layout.addWidget(note)
 
     def _install_sync(self):
-        for attr in ["_tool_job", "_selection_job", "_undo_job", "_redo_job"]:
+        # UI sync must never register undo/redo or tool-change scriptJobs.
+        # Retain selection sync and the existing non-undoable polling timer.
+        for attr in ("_tool_job", "_selection_job", "_undo_job", "_redo_job"):
             try:
-                job = getattr(self, attr)
+                job = getattr(self, attr, None)
                 if job and cmds.scriptJob(exists=job):
                     cmds.scriptJob(kill=job, force=True)
             except Exception:
                 pass
+            setattr(self, attr, None)
         try:
-            self._tool_job = cmds.scriptJob(event=["ToolChanged", self._on_tool_changed], protected=True)
-        except Exception:
-            self._tool_job = None
-        try:
-            self._selection_job = cmds.scriptJob(event=["SelectionChanged", self._on_selection_changed], protected=True)
+            self._selection_job = cmds.scriptJob(
+                event=["SelectionChanged", self._on_selection_changed],
+                protected=True)
         except Exception:
             self._selection_job = None
-        try:
-            self._undo_job = cmds.scriptJob(event=["Undo", self._on_undo_redo], protected=True)
-        except Exception:
-            self._undo_job = None
-        try:
-            self._redo_job = cmds.scriptJob(event=["Redo", self._on_undo_redo], protected=True)
-        except Exception:
-            self._redo_job = None
         if self._poll_timer:
             self._poll_timer.stop()
         self._poll_timer = QtCore.QTimer(self)
@@ -582,9 +571,18 @@ class _BasePanel(QtWidgets.QWidget):
     def _disable_preview_on_shape(self, shape):
         if not shape or not cmds.objExists(shape):
             return
+        previous = self._preview_display_states.pop(shape, None)
         try:
             if cmds.attributeQuery("displayColors", node=shape, exists=True):
-                cmds.setAttr(shape + ".displayColors", 0)
+                value = previous[0] if previous is not None else 0
+                cmds.setAttr(shape + ".displayColors", value)
+        except Exception:
+            pass
+        try:
+            if previous is not None and previous[1] is not None:
+                cmds.polyOptions(shape, colorShadedDisplay=bool(previous[1]))
+            else:
+                cmds.polyOptions(shape, colorShadedDisplay=False)
         except Exception:
             pass
 
@@ -594,14 +592,69 @@ class _BasePanel(QtWidgets.QWidget):
         self._preview_shapes.clear()
 
     def _mark_preview_shape(self, shape):
-        if shape and cmds.objExists(shape):
-            self._preview_shapes.add(shape)
+        if not shape or not cmds.objExists(shape):
+            return
+        if shape not in self._preview_shapes:
+            # Both tabs may preview the same mesh. Reuse the FIRST snapshot,
+            # rather than recording the other tab's already-coloured state.
+            previous = None
+            window = self.window()
+            for name in ("smoothTab", "scaleTab"):
+                other = getattr(window, name, None)
+                if other is not None and other is not self:
+                    previous = other._preview_display_states.get(shape)
+                    if previous is not None:
+                        break
+            if previous is None:
+                display_colors = 0
+                shaded_colors = None
+                try:
+                    display_colors = cmds.getAttr(shape + ".displayColors")
+                except Exception:
+                    pass
+                try:
+                    shaded_colors = cmds.polyOptions(shape, q=True, colorShadedDisplay=True)
+                    if isinstance(shaded_colors, (list, tuple)):
+                        shaded_colors = shaded_colors[0] if shaded_colors else None
+                except Exception:
+                    pass
+                previous = (display_colors, shaded_colors)
+            self._preview_display_states[shape] = previous
+        self._preview_shapes.add(shape)
+        try:
+            cmds.polyOptions(shape, colorShadedDisplay=True)
+        except Exception:
+            pass
+
+    def deactivate_brush(self):
+        # Stop painting first, then restore the original display state once
+        # per mesh (both tabs can have tracked the same shape).
+        cmds.setToolTo("selectSuperContext")
+        window = self.window()
+        panels = [getattr(window, name, None) for name in ("smoothTab", "scaleTab")]
+        panels = [p for p in panels if p is not None]
+        if self not in panels:
+            panels.append(self)
+        originals = {}
+        for panel in panels:
+            for shape, state in panel._preview_display_states.items():
+                originals.setdefault(shape, state)
+        for panel in panels:
+            panel._preview_shapes.clear()
+            panel._preview_display_states.clear()
+        for shape, state in originals.items():
+            if not cmds.objExists(shape):
+                continue
             try:
-                # Vertex colors must be enabled in the viewport as well as
-                # on the mesh shape; otherwise the color set is invisible.
-                cmds.polyOptions(shape, colorShadedDisplay=True)
+                if cmds.attributeQuery("displayColors", node=shape, exists=True):
+                    cmds.setAttr(shape + ".displayColors", state[0])
             except Exception:
                 pass
+            try:
+                cmds.polyOptions(shape, colorShadedDisplay=(bool(state[1]) if state[1] is not None else False))
+            except Exception:
+                pass
+        cmds.refresh(force=True)
 
     def _set_active_shape(self, shape):
         if shape == self._active_shape:
