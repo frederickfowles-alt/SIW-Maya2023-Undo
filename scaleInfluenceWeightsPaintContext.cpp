@@ -17,7 +17,7 @@
 #include <maya/MFnSkinCluster.h>
 #include <maya/MDagPathArray.h>
 #include <maya/MItMeshVertex.h>
-#include <maya/MRenderer.h>
+#include <maya/MViewport2Renderer.h>
 #include <maya/M3dView.h>
 
 #include <cmath>
@@ -339,7 +339,7 @@ void ScaleInfluenceWeightsPaintContext::refreshPreview()
     if (resolveTargetMesh(meshPath))
     {
         updatePreviewColors(meshPath);
-        MHWRender::MRenderer::setGeometryDrawDirty(meshPath);
+        MHWRender::MRenderer::setGeometryDrawDirty(meshPath.node());
         M3dView::active3dView().refresh(false, true);
     }
 }
@@ -523,7 +523,7 @@ MStatus ScaleInfluenceWeightsPaintContext::handlePress(MEvent& event, MHWRender:
         applyCommandToVerts(meshPath, verts, opacities);
         recordStamp(m_hitPoint);
         updatePreviewColors(meshPath);
-        MHWRender::MRenderer::setGeometryDrawDirty(meshPath);
+        MHWRender::MRenderer::setGeometryDrawDirty(meshPath.node());
         M3dView::active3dView().refresh(false, true);
     }
 
@@ -560,7 +560,7 @@ MStatus ScaleInfluenceWeightsPaintContext::handleDrag(MEvent& event, MHWRender::
         applyCommandToVerts(meshPath, verts, opacities);
         recordStamp(m_hitPoint);
         updatePreviewColors(meshPath);
-        MHWRender::MRenderer::setGeometryDrawDirty(meshPath);
+        MHWRender::MRenderer::setGeometryDrawDirty(meshPath.node());
         M3dView::active3dView().refresh(false, true);
     }
 
@@ -1164,7 +1164,7 @@ bool ScaleInfluenceWeightsPaintContext::applyCommandToVerts(const MDagPath& mesh
         cmd += "-linf \""; cmd += m_lockedInfluences[i]; cmd += "\" ";
     }
 
-    const MStatus status = MGlobal::executeCommand(cmd, false, true);
+    const MStatus status = MGlobal::executeCommand(cmd, false, false);
     MGlobal::setActiveSelectionList(oldSel, MGlobal::kReplaceList);
     (void)opacities;
     return status == MS::kSuccess;
@@ -1325,7 +1325,7 @@ bool ScaleInfluenceWeightsPaintContext::updatePreviewColors(const MDagPath& mesh
     status = meshFn.setDisplayColors(true);
     if (status != MS::kSuccess)
         return false;
-    MHWRender::MRenderer::setGeometryDrawDirty(meshPath);
+    MHWRender::MRenderer::setGeometryDrawDirty(meshPath.node());
     return true;
 }
 
@@ -1500,7 +1500,7 @@ bool ScaleInfluenceWeightsPaintContext::updatePreviewColorsSubset(const MDagPath
     status = meshFn.setDisplayColors(true);
     if (status != MS::kSuccess)
         return false;
-    MHWRender::MRenderer::setGeometryDrawDirty(meshPath);
+    MHWRender::MRenderer::setGeometryDrawDirty(meshPath.node());
     return true;
 }
 
