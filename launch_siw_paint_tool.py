@@ -1,28 +1,5 @@
-# Original license:
-# MIT License
-
-# Copyright (c) 2024 Frederick Fowles, Pedro Bellini
-
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-
 import maya.cmds as cmds
+
 try:
     from shiboken2 import wrapInstance
     from PySide2 import QtWidgets, QtCore, QtGui
@@ -37,7 +14,6 @@ except Exception:
     omui = None
     mel = None
     qtUtils = None
-
 
 WINDOW_OBJECT = "siwTabbedToolSettingsWidget"
 WORKSPACE_NAME = "siwTabbedToolSettingsWorkspaceControl"
@@ -322,6 +298,7 @@ class _BasePanel(QtWidgets.QWidget):
         spin.setDecimals(decimals)
         spin.setRange(mn, mx)
         spin.setValue(value)
+
         def sync_from_spin(v):
             slider.blockSignals(True)
             t = (float(v) - mn) / (mx - mn) if mx > mn else 0.0
@@ -329,6 +306,7 @@ class _BasePanel(QtWidgets.QWidget):
             slider.blockSignals(False)
             if not self._building:
                 self.apply_to_context()
+
         def sync_from_slider(v):
             spin.blockSignals(True)
             t = float(v) / 1000.0
@@ -336,6 +314,7 @@ class _BasePanel(QtWidgets.QWidget):
             spin.blockSignals(False)
             if not self._building:
                 self.apply_to_context()
+
         spin.valueChanged.connect(sync_from_spin)
         slider.valueChanged.connect(sync_from_slider)
         sync_from_spin(value)
@@ -354,6 +333,7 @@ class _BasePanel(QtWidgets.QWidget):
         spin.setRange(mn, mx)
         spin.setValue(value)
         max_abs = max(abs(mn), abs(mx), 1.0)
+
         def sync_from_spin(v):
             slider.blockSignals(True)
             t = max(-1.0, min(1.0, float(v) / max_abs))
@@ -361,6 +341,7 @@ class _BasePanel(QtWidgets.QWidget):
             slider.blockSignals(False)
             if not self._building:
                 self.apply_to_context()
+
         def sync_from_slider(v):
             spin.blockSignals(True)
             t = float(v) / 1000.0
@@ -368,6 +349,7 @@ class _BasePanel(QtWidgets.QWidget):
             spin.blockSignals(False)
             if not self._building:
                 self.apply_to_context()
+
         spin.valueChanged.connect(sync_from_spin)
         slider.valueChanged.connect(sync_from_slider)
         sync_from_spin(value)
@@ -392,18 +374,21 @@ class _BasePanel(QtWidgets.QWidget):
         spin = QtWidgets.QSpinBox()
         spin.setRange(mn, mx)
         spin.setValue(value)
+
         def sync_from_spin(v):
             slider.blockSignals(True)
             slider.setValue(int(v))
             slider.blockSignals(False)
             if not self._building:
                 self.apply_to_context()
+
         def sync_from_slider(v):
             spin.blockSignals(True)
             spin.setValue(int(v))
             spin.blockSignals(False)
             if not self._building:
                 self.apply_to_context()
+
         spin.valueChanged.connect(sync_from_spin)
         slider.valueChanged.connect(sync_from_slider)
         sync_from_spin(value)
@@ -412,119 +397,80 @@ class _BasePanel(QtWidgets.QWidget):
         parent.addWidget(box)
         return spin
 
-
-
     def _capture_current_vert_selection(self):
         all_sel = cmds.ls(sl=True, fl=True, long=True) or []
         return [s for s in all_sel if ".vtx[" in s]
 
     def _restore_vert_selection_for_shape(self, verts, shape):
 
-
         transform = _shape_to_transform(shape) if shape else None
-
-
 
         if verts and shape:
 
-
             valid = []
-
 
             for v in verts:
 
-
                 if ".vtx[" not in v:
-
-
                     continue
-
 
                 base = v.split(".vtx[")[0]
 
-
                 if base == shape and cmds.objExists(base):
-
-
                     valid.append(v)
-
-
-    
-
 
             if valid:
 
-
                 try:
-
 
                     if transform and cmds.objExists(transform):
 
-
                         try:
-
 
                             cmds.hilite(transform, r=True)
 
 
                         except Exception:
 
-
                             pass
 
-
                     try:
-
 
                         cmds.selectMode(object=True)
 
 
                     except Exception:
 
-
                         pass
 
-
                     try:
-
 
                         cmds.selectMode(component=True)
 
 
                     except Exception:
 
-
                         pass
 
-
                     try:
-
 
                         cmds.selectType(polymeshVertex=True)
 
 
                     except Exception:
 
-
                         pass
 
-
                     cmds.select(valid, r=True)
-
 
                     return True
 
 
                 except Exception:
 
-
                     pass
 
-
-
         return False
-
-
 
     def _deferred_restore_vert_selection_for_shape(self, verts, shape):
         def _restore():
@@ -532,6 +478,7 @@ class _BasePanel(QtWidgets.QWidget):
                 self._restore_vert_selection_for_shape(verts, shape)
             except Exception:
                 pass
+
         try:
             QtCore.QTimer.singleShot(0, _restore)
             QtCore.QTimer.singleShot(1, _restore)
@@ -539,7 +486,6 @@ class _BasePanel(QtWidgets.QWidget):
             QtCore.QTimer.singleShot(30, _restore)
         except Exception:
             _restore()
-
 
     def _after_flood_refresh_and_restore(self, stored_verts, shape):
         def _run():
@@ -697,7 +643,8 @@ class _BasePanel(QtWidgets.QWidget):
                 else:
                     cmds.scaleInfluenceWeightsPaintContext(ctx, e=True, refreshPreview=True)
             else:
-                if cmds.objExists(self._active_shape) and cmds.attributeQuery("displayColors", node=self._active_shape, exists=True):
+                if cmds.objExists(self._active_shape) and cmds.attributeQuery("displayColors", node=self._active_shape,
+                                                                              exists=True):
                     was_on = cmds.getAttr(self._active_shape + ".displayColors")
                     cmds.setAttr(self._active_shape + ".displayColors", 0)
                     cmds.setAttr(self._active_shape + ".displayColors", was_on)
@@ -717,7 +664,8 @@ class _BasePanel(QtWidgets.QWidget):
         if QtGui is None:
             return
         r, g, b = _palette_color(idx)
-        display_opacity = float(self.display_opacity.value()) if getattr(self, "display_opacity", None) is not None else 1.0
+        display_opacity = float(self.display_opacity.value()) if getattr(self, "display_opacity",
+                                                                         None) is not None else 1.0
         darken = float(self.display_darken.value()) if getattr(self, "display_darken", None) is not None else 0.0
 
         scale = max(0.0, 1.0 - darken)
@@ -771,6 +719,7 @@ class _BasePanel(QtWidgets.QWidget):
                 children_map[parent].append(inf)
             else:
                 roots.append(inf)
+
         def add_item(parent_item, inf_long):
             display_name = inf_long.split("|")[-1] if "|" in inf_long else inf_long
             item = QtWidgets.QTreeWidgetItem(parent_item if parent_item is not None else self.influence_tree)
@@ -781,6 +730,7 @@ class _BasePanel(QtWidgets.QWidget):
                 item.setSelected(True)
             for child in children_map.get(inf_long, []):
                 add_item(item, child)
+
         for root in roots:
             add_item(None, root)
         self.influence_tree.collapseAll()
@@ -790,6 +740,7 @@ class _BasePanel(QtWidgets.QWidget):
 
     def _apply_influence_filter(self, text):
         query = (text or "").strip().lower()
+
         def visit(item):
             name = item.data(1, QtCore.Qt.UserRole)
             if name is not None:
@@ -804,6 +755,7 @@ class _BasePanel(QtWidgets.QWidget):
             if visible and query:
                 item.setExpanded(True)
             return visible
+
         for i in range(self.influence_tree.topLevelItemCount()):
             visit(self.influence_tree.topLevelItem(i))
 
@@ -936,25 +888,34 @@ class _BasePanel(QtWidgets.QWidget):
                 self.keep_ones.setChecked(bool(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, keepOnes=True)))
                 self.strength.setValue(float(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, strength=True)))
                 self.iterations.setValue(int(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, iterations=True)))
-                self.bleed_distance.setValue(int(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, bleedDistance=True)))
-                self.bleed_falloff.setValue(float(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, bleedFalloff=True)))
-                self.brush_radius.setValue(float(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, brushRadius=True)))
+                self.bleed_distance.setValue(
+                    int(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, bleedDistance=True)))
+                self.bleed_falloff.setValue(
+                    float(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, bleedFalloff=True)))
+                self.brush_radius.setValue(
+                    float(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, brushRadius=True)))
                 self.opacity.setValue(float(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, opacity=True)))
                 if self.display_opacity is not None:
-                    self.display_opacity.setValue(float(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, displayOpacity=True)))
+                    self.display_opacity.setValue(
+                        float(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, displayOpacity=True)))
                 if self.display_darken is not None:
-                    self.display_darken.setValue(float(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, displayDarken=True)))
+                    self.display_darken.setValue(
+                        float(cmds.smoothInfluenceWeightsPaintContext(ctx, q=True, displayDarken=True)))
             else:
                 self.strength.setValue(float(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, strength=True)))
                 self.iterations.setValue(int(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, iterations=True)))
-                self.bleed_distance.setValue(int(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, bleedDistance=True)))
-                self.bleed_falloff.setValue(float(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, bleedFalloff=True)))
+                self.bleed_distance.setValue(
+                    int(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, bleedDistance=True)))
+                self.bleed_falloff.setValue(
+                    float(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, bleedFalloff=True)))
                 self.brush_radius.setValue(float(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, brushRadius=True)))
                 self.opacity.setValue(float(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, opacity=True)))
                 if self.display_opacity is not None:
-                    self.display_opacity.setValue(float(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, displayOpacity=True)))
+                    self.display_opacity.setValue(
+                        float(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, displayOpacity=True)))
                 if self.display_darken is not None:
-                    self.display_darken.setValue(float(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, displayDarken=True)))
+                    self.display_darken.setValue(
+                        float(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, displayDarken=True)))
                 self.scale_factor.setValue(float(cmds.scaleInfluenceWeightsPaintContext(ctx, q=True, scaleFactor=True)))
         except Exception:
             pass
@@ -1115,11 +1076,13 @@ class SmoothPanel(_BasePanel):
     TITLE = "Smooth Influence Weights Paint"
     HAS_KEEP = True
 
+
 class ScalePanel(_BasePanel):
     CONTEXT_SUBSTR = "scaleInfluenceWeightsPaintContext"
     TITLE = "Scale Influence Weights Paint"
     HAS_SCALE = True
     COLOR_NOTE = "Scale brush color is purple."
+
 
 class PaintTab(QtWidgets.QWidget):
     def __init__(self, parent=None):
@@ -1140,6 +1103,7 @@ class PaintTab(QtWidgets.QWidget):
                 mel.eval("ArtPaintSkinWeightsTool;")
             except Exception:
                 cmds.warning("Could not activate Maya Paint Skin Weights tool.")
+
 
 class SIWTabbedPanel(QtWidgets.QWidget):
     def __init__(self, parent=None):
@@ -1403,16 +1367,19 @@ class SIWTabbedPanel(QtWidgets.QWidget):
             cmds.refresh()
             self.smoothTab.clear_influences()
             cmds.refresh()
-            self.smoothTab._deferred_restore_vert_selection_for_shape(stored_verts, self.smoothTab._active_shape or _selected_mesh_shape())
+            self.smoothTab._deferred_restore_vert_selection_for_shape(stored_verts,
+                                                                      self.smoothTab._active_shape or _selected_mesh_shape())
         elif idx == 1:
             self.scaleTab.activate_brush()
             cmds.refresh()
             self.scaleTab.clear_influences()
             cmds.refresh()
-            self.scaleTab._deferred_restore_vert_selection_for_shape(stored_verts, self.scaleTab._active_shape or _selected_mesh_shape())
+            self.scaleTab._deferred_restore_vert_selection_for_shape(stored_verts,
+                                                                     self.scaleTab._active_shape or _selected_mesh_shape())
         elif idx == 2:
             self.paintTab.activate()
         self._refresh_display_settings()
+
 
 def show():
     if QtWidgets is None:
