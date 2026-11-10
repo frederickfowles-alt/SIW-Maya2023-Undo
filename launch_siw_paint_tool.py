@@ -1,5 +1,5 @@
 import maya.cmds as cmds
-#
+
 try:
     from shiboken2 import wrapInstance
     from PySide2 import QtWidgets, QtCore, QtGui
@@ -573,31 +573,42 @@ class _BasePanel(QtWidgets.QWidget):
             pass
 
     def deactivate_brush(self):
-        # Stop painting first, then restore the original display state once
-        # per mesh (both tabs can have tracked the same shape).
-        cmds.setToolTo("selectSuperContext")
+        """Restore shading even if the paint context was dropped manually."""
         window = self.window()
         panels = [getattr(window, name, None) for name in ("smoothTab", "scaleTab")]
-        panels = [p for p in panels if p is not None]
+        panels = [panel for panel in panels if panel is not None]
         if self not in panels:
             panels.append(self)
         originals = {}
+        shapes = set()
         for panel in panels:
             for shape, state in panel._preview_display_states.items():
                 originals.setdefault(shape, state)
+            shapes.update(panel._preview_shapes)
+            if panel._active_shape:
+                shapes.add(panel._active_shape)
+        shapes.update(originals)
+        selected = _selected_mesh_shape()
+        if selected:
+            shapes.add(selected)
+        cmds.setToolTo("selectSuperContext")
         for panel in panels:
             panel._preview_shapes.clear()
             panel._preview_display_states.clear()
-        for shape, state in originals.items():
-            if not cmds.objExists(shape):
+        for shape in shapes:
+            if not shape or not cmds.objExists(shape):
                 continue
+            state = originals.get(shape)
+            # If the tool was dropped and tracking was lost, clear SIW colours.
+            display_colors = state[0] if state is not None else 0
+            shaded_colors = bool(state[1]) if state is not None and state[1] is not None else False
             try:
                 if cmds.attributeQuery("displayColors", node=shape, exists=True):
-                    cmds.setAttr(shape + ".displayColors", state[0])
+                    cmds.setAttr(shape + ".displayColors", display_colors)
             except Exception:
                 pass
             try:
-                cmds.polyOptions(shape, colorShadedDisplay=(bool(state[1]) if state[1] is not None else False))
+                cmds.polyOptions(shape, colorShadedDisplay=shaded_colors)
             except Exception:
                 pass
         cmds.refresh(force=True)
